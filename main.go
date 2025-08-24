@@ -52,6 +52,12 @@ func main() {
 	flag.BoolVar(&logHeaders, "log-headers", false, "log request headers")
 	var timeoutSecs int
 	flag.IntVar(&timeoutSecs, "timeout", 10, "timeout in seconds")
+	var allowIPAddress string
+	flag.StringVar(&allowIPAddress,"allow-src-ip", "", "allow source ip address in comma separated, ie: 192.168.0.10,192.168.0.20")
+	var allowDestHost string
+	flag.StringVar(&allowDestHost,"allow-dest-host", "", "allow destination host or ip address, ie: www.google.com,google.com")
+	var denyAll bool
+	flag.BoolVar(&denyAll, "deny-all", false, "deny all source ip address. Make sure you have a whitelist ip address or whitelist dest host" )
 	flag.Parse()
 
 	if version {
@@ -83,6 +89,21 @@ func main() {
 		}
 	}
 
+	var allowIps []string
+	if allowIPAddress != "" {
+		allowIps = strings.Split(allowIPAddress, ",")
+	}
+	
+	var allowHosts []string
+	if allowDestHost != "" {
+		allowHosts = strings.Split(allowDestHost, ",")
+	}
+
+	glog.V(0).Infof("Allow source ip address %s", allowIps)
+	glog.V(0).Infof("Allow dest host %s", allowHosts)
+	glog.V(0).Infof("Deny all %v", denyAll)
+	glog.V(0).Infof("Listening on %v:%v", bind, port)
+
 	var handler http.Handler
 	if basicAuth == "" {
 		handler = &proxy.ProxyHandler{
@@ -90,6 +111,9 @@ func main() {
 			LogAuth:       logAuth,
 			LogHeaders:    logHeaders,
 			Socks5Forward: socks5Forward,
+			AllowSrcIPAddress: allowIps,
+			AllowDestHost: allowHosts,
+			DenyAll: denyAll,
 		}
 	} else {
 		parts := strings.Split(basicAuth, ":")
@@ -103,6 +127,9 @@ func main() {
 			LogAuth:       logAuth,
 			LogHeaders:    logHeaders,
 			Socks5Forward: socks5Forward,
+			AllowSrcIPAddress: allowIps,
+			AllowDestHost: allowHosts,
+			DenyAll: denyAll,
 		}
 	}
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strings"
 	"time"
+	"slices"
 
 	"github.com/golang/glog"
 	netProxy "golang.org/x/net/proxy"
@@ -25,6 +26,9 @@ type ProxyHandler struct {
 	LogAuth       bool
 	LogHeaders    bool
 	Socks5Forward *Socks5Forward
+	AllowSrcIPAddress []string
+	AllowDestHost	[]string
+	DenyAll			bool
 }
 
 type Socks5Forward struct {
@@ -32,9 +36,31 @@ type Socks5Forward struct {
 	Username *string
 	Password *string
 }
+func GetUserIP(r *http.Request) string {
+    IPAddress := r.Header.Get("X-Real-Ip")
+    if IPAddress == "" {
+        IPAddress = r.Header.Get("X-Forwarded-For")
+    }
+    if IPAddress == "" {
+        ipaddr := strings.Split(r.RemoteAddr,":")
+		if len(ipaddr) > 0 {
+			IPAddress = ipaddr[0]
+		}
+    }
+    return IPAddress
+}
 
 func (p *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	glog.V(1).Infof("Serving '%s' request from '%s' to '%s'\n", r.Method, r.RemoteAddr, r.Host)
+	ipaddr := GetUserIP(r)
+	if p.DenyAll && 
+	!slices.Contains(p.AllowSrcIPAddress, ipaddr)  &&
+	!slices.Contains(p.AllowDestHost, r.Host) {
+		glog.V(1).Infof("Blocking '%s' request from '%s' to '%s'. IP Address not allowed\n", r.Method, ipaddr, r.Host)	
+		http.Error(w, "Forbidden", 403)
+		return
+	}
+
+	glog.V(1).Infof("Serving '%s' request from '%s' to '%s'\n", r.Method, ipaddr, r.Host)
 	if p.LogHeaders {
 		for name, values := range r.Header {
 			for i, value := range values {
