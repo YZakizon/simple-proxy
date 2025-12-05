@@ -90,11 +90,18 @@ func main() {
 	}
 
 	var allowIps []string
+	if allowIPAddress == "" {
+		allowIPAddress = os.Getenv("ALLOW_SRC_IP")
+	}
+
 	if allowIPAddress != "" {
 		allowIps = strings.Split(allowIPAddress, ",")
 	}
 	
 	var allowHosts []string
+	if allowDestHost == "" {
+		allowDestHost = os.Getenv("ALLOW_DEST_HOST")
+	}
 	if allowDestHost != "" {
 		allowHosts = strings.Split(allowDestHost, ",")
 	}

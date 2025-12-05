@@ -1,0 +1,22 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: simple-proxy:latest
+    container_name: simple-proxy
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - 8888:8888
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--no-check-certificate", "-q", "https://localhost:8888/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    volumes:
+      - /etc/letsencrypt/live/:/etc/letsencrypt/live
+      - /etc/letsencrypt/archive:/etc/letsencrypt/archive
+    command: "-basic-auth $BASIC_AUTH -cert $SSL_CERT -key $SSL_KEY -alsologtostderr -protocol https -v 2 -deny-all -allow-src-ip $ALLOW_SRC_IP -allow-dest-host $ALLOW_DEST_HOST"

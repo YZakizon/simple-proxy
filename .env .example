@@ -1,0 +1,5 @@
+ALLOW_SRC_IP=1.1.1.1,2.2.2.2
+ALLOW_DEST_HOST=www.youtube.com,www.youtube.com:443,youtube.com,youtube.com:443,www.youtu.be,www.youtu.be:443,youtu.be,youtu.be:443
+BASIC_AUTH="simpleproxy:super_secret_please_change"
+SSL_CERT=/etc/letsencrypt/live/pr.your-domain.com/fullchain.pem
+SSL_KEY=/etc/letsencrypt/live/pr.your-domain.com/privkey.pem

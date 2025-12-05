@@ -6,3 +6,5 @@ require (
 	github.com/golang/glog v1.2.5
 	golang.org/x/net v0.41.0
 )
+
+require golang.org/x/sync v0.15.0 // indirect

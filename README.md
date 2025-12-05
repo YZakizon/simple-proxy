@@ -19,6 +19,9 @@ Code based on the guide here: <https://medium.com/@mlowicki/http-s-proxy-in-gola
 - Can log failed authentication attempt details
 - Printing version number
 - Tunnelling HTTP proxy to SOCKS5 proxy
+- Add source ip whitelist
+- Add destination host whitelist
+- Add deny all 
 
 ## Install
 
@@ -125,3 +128,4 @@ curl.exe --proxy 'http://localhost:8888' 'https://www.random.org/integers/?num=1
 ## Contributing
 
 See the [CONTRIBUTING](./CONTRIBUTING.md) and [CODE OF CONDUCT](./CODE_OF_CONDUCT.md) documents.
+
