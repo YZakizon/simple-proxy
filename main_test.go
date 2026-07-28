@@ -4,6 +4,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -113,5 +114,29 @@ func TestReadCredentialFile(t *testing.T) {
 	}
 	if _, err := readCredentialFile(largePath); err == nil {
 		t.Fatal("oversized credential file should be rejected")
+	}
+}
+
+func TestSplitNonempty(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name  string
+		value string
+		want  []string
+	}{
+		{name: "values without whitespace", value: "192.0.2.1,198.51.100.2", want: []string{"192.0.2.1", "198.51.100.2"}},
+		{name: "spaces after commas", value: "192.0.2.1, 198.51.100.2", want: []string{"192.0.2.1", "198.51.100.2"}},
+		{name: "surrounding whitespace", value: "  example.test,\tapi.example.test \n", want: []string{"example.test", "api.example.test"}},
+		{name: "empty entries", value: "192.0.2.1, ,198.51.100.2,", want: []string{"192.0.2.1", "198.51.100.2"}},
+		{name: "empty value", value: "", want: nil},
+	}
+	for _, test := range tests {
+		test := test
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+			if got := splitNonempty(test.value); !reflect.DeepEqual(got, test.want) {
+				t.Fatalf("splitNonempty(%q) = %#v, want %#v", test.value, got, test.want)
+			}
+		})
 	}
 }
