@@ -19,4 +19,20 @@ services:
     volumes:
       - /etc/letsencrypt/live/:/etc/letsencrypt/live
       - /etc/letsencrypt/archive:/etc/letsencrypt/archive
-    command: "-basic-auth $BASIC_AUTH -cert $SSL_CERT -key $SSL_KEY -alsologtostderr -protocol https -v 2 -deny-all -allow-src-ip $ALLOW_SRC_IP -allow-dest-host $ALLOW_DEST_HOST"
+    command:
+      - -basic-auth
+      - "$BASIC_AUTH"
+      - -cert
+      - "$SSL_CERT"
+      - -key
+      - "$SSL_KEY"
+      - -alsologtostderr
+      - -protocol
+      - https
+      - -v
+      - "2"
+      - -deny-all
+      - -allow-src-ip
+      - "$ALLOW_SRC_IP"
+      - -allow-dest-host
+      - "$ALLOW_DEST_HOST"

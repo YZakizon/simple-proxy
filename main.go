@@ -27,6 +27,17 @@ func init() {
 	flag.Set("logtostderr", "true")
 }
 
+func parseCommaSeparatedList(value string) []string {
+	var items []string
+	for _, item := range strings.Split(value, ",") {
+		item = strings.TrimSpace(item)
+		if item != "" {
+			items = append(items, item)
+		}
+	}
+	return items
+}
+
 func main() {
 	var version bool
 	flag.BoolVar(&version, "version", false, "prints current simple-proxy version")
@@ -95,7 +106,7 @@ func main() {
 	}
 
 	if allowIPAddress != "" {
-		allowIps = strings.Split(allowIPAddress, ",")
+		allowIps = parseCommaSeparatedList(allowIPAddress)
 	}
 
 	var allowHosts []string
@@ -103,7 +114,7 @@ func main() {
 		allowDestHost = os.Getenv("ALLOW_DEST_HOST")
 	}
 	if allowDestHost != "" {
-		allowHosts = strings.Split(allowDestHost, ",")
+		allowHosts = parseCommaSeparatedList(allowDestHost)
 	}
 
 	glog.V(0).Infof("Allow source ip address %s", allowIps)
