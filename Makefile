@@ -1,8 +1,8 @@
 VERSION=development
 DOCKER_COMPOSE ?= docker compose
 
-.PHONY: default zip lint format test test-unit test-integration test-smoke test-youtube test-ci \
-	docker-run docker-build-run docker-stop
+.PHONY: default zip lint format test test-unit test-integration test-race test-smoke \
+	test-youtube test-ci vuln verify docker-run docker-build-run docker-stop
 
 default:
 	@echo "=============Building binaries============="
@@ -56,22 +56,26 @@ lint:
 
 format:
 	@echo "=============Formatting============="
-	gofmt -s -w .
+	gofmt -s -w main.go main_test.go proxy/*.go
 	go mod tidy
 
 test:
-	@echo "=============Running all Go tests============="
+	@echo "=============Running all test layers============="
 	$(MAKE) test-unit
 	$(MAKE) test-integration
 	$(MAKE) test-smoke
 
 test-unit:
 	@echo "=============Running unit tests============="
-	go test ./proxy
+	go test . ./proxy
 
 test-integration:
 	@echo "=============Running integration tests============="
 	go test ./integration
+
+test-race:
+	@echo "=============Running tests with race detector============="
+	go test -race ./...
 
 test-smoke:
 	@echo "=============Running smoke test============="
@@ -84,7 +88,20 @@ test-youtube:
 test-ci: lint
 	@echo "=============Checking formatting============="
 	test -z "$$(gofmt -l .)"
+	go vet ./...
 	$(MAKE) test
+
+vuln:
+	@echo "=============Scanning for known vulnerabilities============="
+	go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+
+verify:
+	@echo "=============Checking formatting============="
+	test -z "$$(gofmt -l .)"
+	go vet ./...
+	$(MAKE) test-race
+	$(MAKE) test-smoke
+	$(MAKE) vuln
 
 docker-run:
 	@echo "=============Starting Docker services============="

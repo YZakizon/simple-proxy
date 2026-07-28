@@ -15,7 +15,7 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-go build -o "$test_dir/simple-proxy" .
+go build -buildvcs=false -o "$test_dir/simple-proxy" .
 "$test_dir/simple-proxy" \
 	-bind 127.0.0.1 \
 	-port "$test_port" \

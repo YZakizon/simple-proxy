@@ -1,28 +1,23 @@
-# Stage 1: Build the Go binary
-FROM golang:1.24 AS builder
+# Keep this exact patch version aligned with go.mod and CI.
+FROM golang:1.25.12-alpine3.23@sha256:cc985ef6f9c3bf9ece7488129c9abe0a150388ccdfa428d886fc709dca0b230a AS builder
 
-WORKDIR /app
+WORKDIR /src
 
-# Copy go.mod and go.sum first to leverage caching
-COPY go.mod ./
-RUN go mod download
+COPY go.mod go.sum ./
+RUN go mod download && go mod verify
 
-# Copy the rest of the source code
-COPY . .
+COPY main.go ./
+COPY proxy ./proxy
 
-# Build the Go binary
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o simple-proxy main.go
+ARG VERSION=development
+RUN CGO_ENABLED=0 go build \
+    -trimpath \
+    -ldflags="-s -w -buildid= -X main.Version=${VERSION}" \
+    -o /out/simple-proxy .
 
-# Stage 2: Use distroless base image
-# FROM gcr.io/distroless/base-debian12
-FROM alpine:latest
+FROM gcr.io/distroless/static-debian12:nonroot@sha256:f5b485ea962d9bd1186b2f6b3a061191539b905b82ec395de78cbfae51f20e35
 
-# Copy the binary from the builder stage
-COPY --from=builder /app/simple-proxy /app/
+COPY --from=builder --chown=nonroot:nonroot /out/simple-proxy /app/simple-proxy
 
-ENV PATH=$PATH:/app
-
-# Set the entrypoint
+USER nonroot:nonroot
 ENTRYPOINT ["/app/simple-proxy"]
-
-  

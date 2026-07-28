@@ -5,33 +5,35 @@ on:
   release:
     types: [created]
 jobs:
-  test:
-    name: Test (${{ matrix.suite }})
+  security-and-test:
+    name: Security and test
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        suite: [unit, integration, smoke]
     steps:
-    - name: Set up Go 1.24
+    - name: Set up Go 1.25.12
       uses: actions/setup-go@v5
       with:
-        go-version: '1.24'
+        go-version: '1.25.12'
         cache: true
     - name: Check out code
       uses: actions/checkout@v4
-    - name: Run ${{ matrix.suite }} tests
-      run: make test-${{ matrix.suite }}
+    - name: Check formatting
+      run: test -z "$(gofmt -l .)"
+    - name: Vet
+      run: go vet ./...
+    - name: Test with race detector
+      run: go test -race ./...
+    - name: Vulnerability scan
+      run: go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
 
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: test
+    needs: security-and-test
     steps:
-    - name: Set up Go 1.24
+    - name: Set up Go 1.25.12
       uses: actions/setup-go@v5
       with:
-        go-version: 1.24
+        go-version: '1.25.12'
     - name: Check out code into the Go module directory
       uses: actions/checkout@v4
     - name: Lint

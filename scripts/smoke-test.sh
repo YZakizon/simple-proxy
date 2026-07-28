@@ -14,20 +14,16 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM
 
-go build -o "$smoke_dir/simple-proxy" .
+go build -buildvcs=false -o "$smoke_dir/simple-proxy" .
 "$smoke_dir/simple-proxy" -bind 127.0.0.1 -port "$smoke_port" >"$smoke_dir/proxy.log" 2>&1 &
 proxy_pid=$!
 
 attempt=0
 while [ "$attempt" -lt 20 ]; do
-	if response="$(
-		curl --fail --silent --show-error "http://127.0.0.1:$smoke_port/health" 2>/dev/null |
-			tr -d '\r\n'
-	)"; then
-		if [ "$response" = "OK" ]; then
-			printf '%s\n' "Smoke test passed: health endpoint returned OK"
-			exit 0
-		fi
+	if "$smoke_dir/simple-proxy" \
+		-healthcheck-url "http://127.0.0.1:$smoke_port/health" 2>/dev/null; then
+		printf '%s\n' "Smoke test passed: local healthcheck succeeded"
+		exit 0
 	fi
 	if ! kill -0 "$proxy_pid" 2>/dev/null; then
 		printf '%s\n' "Smoke test failed: simple-proxy exited early" >&2
