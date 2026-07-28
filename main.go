@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/tls"
+	"errors"
 	"flag"
 	"fmt"
 	"log"
@@ -36,6 +37,55 @@ func parseCommaSeparatedList(value string) []string {
 		}
 	}
 	return items
+}
+
+func validateStartupConfig(protocol, certPath, keyPath string) error {
+	if protocol != httpProtocol && protocol != httpsProtocol {
+		return fmt.Errorf("protocol must be either %q or %q, got %q", httpProtocol, httpsProtocol, protocol)
+	}
+	if protocol != httpsProtocol {
+		return nil
+	}
+
+	var missing []string
+	if certPath == "" {
+		missing = append(missing, "--cert")
+	}
+	if keyPath == "" {
+		missing = append(missing, "--key")
+	}
+	if len(missing) != 0 {
+		return fmt.Errorf("HTTPS proxy requires %s", strings.Join(missing, " and "))
+	}
+	return nil
+}
+
+func validateTLSFiles(certPath, keyPath string) error {
+	if _, err := os.Stat(certPath); err != nil {
+		return fmt.Errorf("TLS certificate file %q is unavailable: %w", certPath, err)
+	}
+	if _, err := os.Stat(keyPath); err != nil {
+		return fmt.Errorf("TLS private key file %q is unavailable: %w", keyPath, err)
+	}
+	return nil
+}
+
+func serveProxy(server *http.Server, protocol, certPath, keyPath string) error {
+	if protocol == httpsProtocol {
+		if err := validateTLSFiles(certPath, keyPath); err != nil {
+			return fmt.Errorf("cannot start HTTPS proxy on %s: %w", server.Addr, err)
+		}
+		if err := server.ListenAndServeTLS(certPath, keyPath); err != nil &&
+			!errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("HTTPS proxy on %s stopped unexpectedly: %w", server.Addr, err)
+		}
+		return nil
+	}
+
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return fmt.Errorf("HTTP proxy on %s stopped unexpectedly: %w", server.Addr, err)
+	}
+	return nil
 }
 
 func main() {
@@ -76,12 +126,8 @@ func main() {
 		os.Exit(0)
 	}
 
-	if protocol != httpProtocol && protocol != httpsProtocol {
-		glog.Fatalln("Protocol must be either http or https")
-	}
-
-	if protocol == httpsProtocol && (certPath == "" || keyPath == "") {
-		glog.Fatalf("If using HTTPS protocol --cert and --key are required\n")
+	if err := validateStartupConfig(protocol, certPath, keyPath); err != nil {
+		log.Fatalf("simple-proxy is exiting because configuration is invalid: %v", err)
 	}
 
 	var socks5Forward *proxy.Socks5Forward
@@ -92,7 +138,10 @@ func main() {
 		if socks5Auth != "" {
 			parts := strings.Split(socks5Auth, ":")
 			if len(parts) < 2 {
-				glog.Fatalf("Invalid socks5 basic auth provided, must be in format 'username:password', auth: %s\n", basicAuth)
+				log.Fatal(
+					"simple-proxy is exiting because SOCKS5 authentication is invalid; " +
+						"expected username:password",
+				)
 			}
 
 			socks5Forward.Username = &parts[0]
@@ -136,7 +185,10 @@ func main() {
 	} else {
 		parts := strings.Split(basicAuth, ":")
 		if len(parts) < 2 {
-			glog.Fatalf("Invalid basic auth provided, must be in format 'username:password', auth: %s\n", basicAuth)
+			log.Fatal(
+				"simple-proxy is exiting because proxy authentication is invalid; " +
+					"expected username:password",
+			)
 		}
 		handler = &proxy.ProxyHandler{
 			Timeout:           time.Duration(timeoutSecs) * time.Second,
@@ -163,9 +215,11 @@ func main() {
 		if socks5 != "" {
 			glog.V(0).Infof("Tunneling HTTP requests to SOCKS5 proxy: %s\n", socks5)
 		}
-		log.Fatal(server.ListenAndServe())
 	} else {
 		glog.V(0).Infoln("Starting HTTPS proxy...")
-		log.Fatal(server.ListenAndServeTLS(certPath, keyPath))
+	}
+
+	if err := serveProxy(server, protocol, certPath, keyPath); err != nil {
+		log.Fatalf("simple-proxy is exiting because the server could not run: %v", err)
 	}
 }

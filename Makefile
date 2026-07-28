@@ -1,8 +1,12 @@
 VERSION=development
 DOCKER_COMPOSE ?= docker compose
+TEST_SSL_DIR ?= .test-certs
+TEST_SSL_CERT ?= $(TEST_SSL_DIR)/fullchain.pem
+TEST_SSL_KEY ?= $(TEST_SSL_DIR)/privkey.pem
 
-.PHONY: default zip lint format test test-unit test-integration test-smoke test-youtube test-ci \
-	docker-run docker-build-run docker-stop
+.PHONY: default zip lint format test test-unit test-integration test-smoke test-youtube \
+	test-youtube-ssl test-ci \
+	gen-test-ssl live-test docker-run docker-build-run docker-stop docker-logs
 
 default:
 	@echo "=============Building binaries============="
@@ -67,7 +71,7 @@ test:
 
 test-unit:
 	@echo "=============Running unit tests============="
-	go test ./proxy
+	go test . ./proxy
 
 test-integration:
 	@echo "=============Running integration tests============="
@@ -81,10 +85,31 @@ test-youtube:
 	@echo "=============Testing YouTube through the proxy============="
 	./scripts/youtube-connect-test.sh
 
+test-youtube-ssl:
+	@echo "=============Testing YouTube through the HTTPS proxy============="
+	./scripts/youtube-connect-test-ssl.sh
+
 test-ci: lint
 	@echo "=============Checking formatting============="
 	test -z "$$(gofmt -l .)"
 	$(MAKE) test
+
+gen-test-ssl:
+	@echo "=============Generating test TLS certificate============="
+	mkdir -p "$(TEST_SSL_DIR)"
+	openssl req -x509 -newkey rsa:2048 -nodes \
+		-keyout "$(TEST_SSL_KEY)" \
+		-out "$(TEST_SSL_CERT)" \
+		-days 1 \
+		-subj "/CN=localhost" \
+		-addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
+	chmod 600 "$(TEST_SSL_KEY)"
+	@echo "Certificate: $(TEST_SSL_CERT)"
+	@echo "Private key: $(TEST_SSL_KEY)"
+
+live-test:
+	@echo "=============Testing live HTTPS proxy destinations============="
+	./scripts/live-test.sh
 
 docker-run:
 	@echo "=============Starting Docker services============="
@@ -97,3 +122,6 @@ docker-build-run:
 docker-stop:
 	@echo "=============Stopping Docker services============="
 	$(DOCKER_COMPOSE) stop
+
+docker-logs:
+	$(DOCKER_COMPOSE) logs -f
