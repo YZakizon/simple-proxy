@@ -53,11 +53,11 @@ func main() {
 	var timeoutSecs int
 	flag.IntVar(&timeoutSecs, "timeout", 10, "timeout in seconds")
 	var allowIPAddress string
-	flag.StringVar(&allowIPAddress,"allow-src-ip", "", "allow source ip address in comma separated, ie: 192.168.0.10,192.168.0.20")
+	flag.StringVar(&allowIPAddress, "allow-src-ip", "", "allow source ip address in comma separated, ie: 192.168.0.10,192.168.0.20")
 	var allowDestHost string
-	flag.StringVar(&allowDestHost,"allow-dest-host", "", "allow destination host or ip address, ie: www.google.com,google.com")
+	flag.StringVar(&allowDestHost, "allow-dest-host", "", "allow destination host or ip address, ie: www.google.com,google.com")
 	var denyAll bool
-	flag.BoolVar(&denyAll, "deny-all", false, "deny all source ip address. Make sure you have a whitelist ip address or whitelist dest host" )
+	flag.BoolVar(&denyAll, "deny-all", false, "deny all source ip address. Make sure you have a whitelist ip address or whitelist dest host")
 	flag.Parse()
 
 	if version {
@@ -97,7 +97,7 @@ func main() {
 	if allowIPAddress != "" {
 		allowIps = strings.Split(allowIPAddress, ",")
 	}
-	
+
 	var allowHosts []string
 	if allowDestHost == "" {
 		allowDestHost = os.Getenv("ALLOW_DEST_HOST")
@@ -114,13 +114,13 @@ func main() {
 	var handler http.Handler
 	if basicAuth == "" {
 		handler = &proxy.ProxyHandler{
-			Timeout:       time.Duration(timeoutSecs) * time.Second,
-			LogAuth:       logAuth,
-			LogHeaders:    logHeaders,
-			Socks5Forward: socks5Forward,
+			Timeout:           time.Duration(timeoutSecs) * time.Second,
+			LogAuth:           logAuth,
+			LogHeaders:        logHeaders,
+			Socks5Forward:     socks5Forward,
 			AllowSrcIPAddress: allowIps,
-			AllowDestHost: allowHosts,
-			DenyAll: denyAll,
+			AllowDestHost:     allowHosts,
+			DenyAll:           denyAll,
 		}
 	} else {
 		parts := strings.Split(basicAuth, ":")
@@ -128,15 +128,15 @@ func main() {
 			glog.Fatalf("Invalid basic auth provided, must be in format 'username:password', auth: %s\n", basicAuth)
 		}
 		handler = &proxy.ProxyHandler{
-			Timeout:       time.Duration(timeoutSecs) * time.Second,
-			Username:      &parts[0],
-			Password:      &parts[1],
-			LogAuth:       logAuth,
-			LogHeaders:    logHeaders,
-			Socks5Forward: socks5Forward,
+			Timeout:           time.Duration(timeoutSecs) * time.Second,
+			Username:          &parts[0],
+			Password:          &parts[1],
+			LogAuth:           logAuth,
+			LogHeaders:        logHeaders,
+			Socks5Forward:     socks5Forward,
 			AllowSrcIPAddress: allowIps,
-			AllowDestHost: allowHosts,
-			DenyAll: denyAll,
+			AllowDestHost:     allowHosts,
+			DenyAll:           denyAll,
 		}
 	}
 

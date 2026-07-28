@@ -5,9 +5,28 @@ on:
   release:
     types: [created]
 jobs:
+  test:
+    name: Test (${{ matrix.suite }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [unit, integration, smoke]
+    steps:
+    - name: Set up Go 1.24
+      uses: actions/setup-go@v5
+      with:
+        go-version: '1.24'
+        cache: true
+    - name: Check out code
+      uses: actions/checkout@v4
+    - name: Run ${{ matrix.suite }} tests
+      run: make test-${{ matrix.suite }}
+
   build:
     name: Build
     runs-on: ubuntu-latest
+    needs: test
     steps:
     - name: Set up Go 1.24
       uses: actions/setup-go@v5
