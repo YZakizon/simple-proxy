@@ -1,0 +1,12 @@
+.git
+.github
+.env
+.env*
+.worktrees
+dist
+secrets
+*_test.go
+integration
+scripts
+README*
+SECURITY_PLAN.md

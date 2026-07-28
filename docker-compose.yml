@@ -1,22 +1,56 @@
 services:
-  api:
+  proxy:
     build:
       context: .
       dockerfile: Dockerfile
-    image: simple-proxy:latest
+    image: simple-proxy:local
     container_name: simple-proxy
     restart: unless-stopped
-    env_file:
-      - .env
+    init: true
+    read_only: true
+    user: "65532:65532"
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:size=16m,mode=1777
+    secrets:
+      - proxy_basic_auth
     ports:
-      - 8888:8888
+      - "${PROXY_PUBLISH_ADDRESS:-127.0.0.1}:${PROXY_PORT:-8888}:8888"
     healthcheck:
-      test: ["CMD", "wget", "--spider", "--no-check-certificate", "-q", "https://localhost:8888/health"]
+      test:
+        - CMD
+        - /app/simple-proxy
+        - -healthcheck-url
+        - https://127.0.0.1:8888/health
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 5s
     volumes:
-      - /etc/letsencrypt/live/:/etc/letsencrypt/live
-      - /etc/letsencrypt/archive:/etc/letsencrypt/archive
-    command: "-basic-auth $BASIC_AUTH -cert $SSL_CERT -key $SSL_KEY -alsologtostderr -protocol https -v 2 -deny-all -allow-src-ip $ALLOW_SRC_IP -allow-dest-host $ALLOW_DEST_HOST"
+      - "${SSL_CERT_FILE:-./secrets/tls-cert.pem}:/run/tls/cert.pem:ro"
+      - "${SSL_KEY_FILE:-./secrets/tls-key.pem}:/run/tls/key.pem:ro"
+    command:
+      - -bind
+      - 0.0.0.0
+      - -port
+      - "8888"
+      - -protocol
+      - https
+      - -cert
+      - /run/tls/cert.pem
+      - -key
+      - /run/tls/key.pem
+      - -basic-auth-file
+      - /run/secrets/proxy_basic_auth
+      - -deny-all
+      - -allow-src-ip
+      - "${ALLOW_SRC_IP:-127.0.0.1}"
+      - -allow-dest-host
+      - "${ALLOW_DEST_HOST:-}"
+
+secrets:
+  proxy_basic_auth:
+    file: "${BASIC_AUTH_FILE:-./secrets/proxy_basic_auth}"

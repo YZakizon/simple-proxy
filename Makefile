@@ -52,9 +52,29 @@ lint:
 
 format:
 	@echo "=============Formatting============="
-	gofmt -s -w .
+	gofmt -s -w main.go main_test.go proxy/*.go
 	go mod tidy
 
 test:
 	@echo "=============Running unit tests============="
 	go test ./...
+
+test-race:
+	@echo "=============Running tests with race detector============="
+	go test -race ./...
+
+test-smoke:
+	@echo "=============Running smoke test============="
+	./scripts/smoke-test.sh
+
+vuln:
+	@echo "=============Scanning for known vulnerabilities============="
+	go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+
+verify:
+	@echo "=============Checking formatting============="
+	test -z "$$(gofmt -l .)"
+	go vet ./...
+	$(MAKE) test-race
+	$(MAKE) test-smoke
+	$(MAKE) vuln
