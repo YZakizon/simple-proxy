@@ -1,12 +1,11 @@
 VERSION=development
 DOCKER_COMPOSE ?= docker compose
-TEST_SSL_DIR ?= .test-certs
-TEST_SSL_CERT ?= $(TEST_SSL_DIR)/fullchain.pem
-TEST_SSL_KEY ?= $(TEST_SSL_DIR)/privkey.pem
+TEST_SSL_CERT ?= secrets/tls-cert.pem
+TEST_SSL_KEY ?= secrets/tls-key.pem
 
-.PHONY: default zip lint format test test-unit test-integration test-smoke test-youtube \
-	test-youtube-ssl test-ci \
-	gen-test-ssl live-test docker-run docker-build-run docker-stop docker-logs
+.PHONY: default zip lint format test test-unit test-integration test-race test-smoke \
+	test-youtube test-youtube-ssl test-ci vuln verify gen-test-ssl live-test \
+	docker-run docker-build-run docker-stop docker-logs
 
 default:
 	@echo "=============Building binaries============="
@@ -60,11 +59,11 @@ lint:
 
 format:
 	@echo "=============Formatting============="
-	gofmt -s -w .
+	gofmt -s -w main.go main_test.go proxy/*.go
 	go mod tidy
 
 test:
-	@echo "=============Running all Go tests============="
+	@echo "=============Running all test layers============="
 	$(MAKE) test-unit
 	$(MAKE) test-integration
 	$(MAKE) test-smoke
@@ -76,6 +75,10 @@ test-unit:
 test-integration:
 	@echo "=============Running integration tests============="
 	go test ./integration
+
+test-race:
+	@echo "=============Running tests with race detector============="
+	go test -race ./...
 
 test-smoke:
 	@echo "=============Running smoke test============="
@@ -92,11 +95,24 @@ test-youtube-ssl:
 test-ci: lint
 	@echo "=============Checking formatting============="
 	test -z "$$(gofmt -l .)"
+	go vet ./...
 	$(MAKE) test
+
+vuln:
+	@echo "=============Scanning for known vulnerabilities============="
+	go run golang.org/x/vuln/cmd/govulncheck@v1.6.0 ./...
+
+verify:
+	@echo "=============Checking formatting============="
+	test -z "$$(gofmt -l .)"
+	go vet ./...
+	$(MAKE) test-race
+	$(MAKE) test-smoke
+	$(MAKE) vuln
 
 gen-test-ssl:
 	@echo "=============Generating test TLS certificate============="
-	mkdir -p "$(TEST_SSL_DIR)"
+	mkdir -p "$(dir $(TEST_SSL_CERT))" "$(dir $(TEST_SSL_KEY))"
 	openssl req -x509 -newkey rsa:2048 -nodes \
 		-keyout "$(TEST_SSL_KEY)" \
 		-out "$(TEST_SSL_CERT)" \
@@ -104,8 +120,8 @@ gen-test-ssl:
 		-subj "/CN=localhost" \
 		-addext "subjectAltName=DNS:localhost,IP:127.0.0.1"
 	chmod 600 "$(TEST_SSL_KEY)"
-	@echo "Certificate: $(TEST_SSL_CERT)"
-	@echo "Private key: $(TEST_SSL_KEY)"
+	@echo "SSL_CERT_FILE=$(TEST_SSL_CERT)"
+	@echo "SSL_KEY_FILE=$(TEST_SSL_KEY)"
 
 live-test:
 	@echo "=============Testing live HTTPS proxy destinations============="

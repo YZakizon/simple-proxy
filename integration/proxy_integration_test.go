@@ -22,7 +22,9 @@ func TestHTTPProxyEndToEnd(t *testing.T) {
 	}))
 	t.Cleanup(origin.Close)
 
-	proxyServer := httptest.NewServer(proxy.NewProxyHandler(2))
+	handler := proxy.NewProxyHandler(2)
+	handler.AllowPrivateDestinations = true
+	proxyServer := httptest.NewServer(handler)
 	t.Cleanup(proxyServer.Close)
 
 	client := proxyClient(t, proxyServer.URL)
@@ -59,6 +61,7 @@ func TestHTTPProxyAuthentication(t *testing.T) {
 	handler := proxy.NewProxyHandler(2)
 	handler.Username = &username
 	handler.Password = &password
+	handler.AllowPrivateDestinations = true
 	proxyServer := httptest.NewServer(handler)
 	t.Cleanup(proxyServer.Close)
 

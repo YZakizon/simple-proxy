@@ -1,3 +1,5 @@
 dist/
 .env
+secrets/*
+!secrets/README.md
 .test-certs/

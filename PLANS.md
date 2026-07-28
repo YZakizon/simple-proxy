@@ -12,14 +12,14 @@ Docker Compose and trimming whitespace during parsing.
 
 ### Implementation Changes
 
-- Add a shared comma-list parser in `main.go` that trims surrounding whitespace
+- Use the shared `splitNonempty` parser in `main.go` to trim surrounding whitespace
   from every item and ignores empty items.
 - Use it for both `--allow-src-ip` and `--allow-dest-host`, covering direct CLI
   and `.env`-derived values.
 - Change `docker-compose.yml` from a whitespace-split command string to YAML
   argument-list form so values containing spaces reach the application as
   single arguments.
-- Preserve all existing unrelated uncommitted changes.
+- Preserve the security-hardening listener and destination-policy controls.
 
 ### Interfaces
 
@@ -40,8 +40,7 @@ Docker Compose and trimming whitespace during parsing.
 
 - "Spaces" means surrounding whitespace around individual list entries, not
   whitespace inside valid host or IP text.
-- The tracked `.env .example` filename and contents remain unchanged because
-  runtime trimming was selected.
+- The corrected `.env.example` documents values without storing credentials.
 
 ### Validation
 

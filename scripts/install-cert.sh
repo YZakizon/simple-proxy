@@ -79,8 +79,15 @@ fi
 
 deploy_hook_dir=/etc/letsencrypt/renewal-hooks/deploy
 deploy_hook="$deploy_hook_dir/restart-simple-proxy"
+deploy_hook_config="$deploy_hook_dir/simple-proxy.conf"
+script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+project_dir=$(cd -- "$script_dir/.." && pwd)
+secrets_dir="$project_dir/secrets"
 
 install -d -m 0755 "$deploy_hook_dir"
+install -d -o 65532 -g 65532 -m 0750 "$secrets_dir"
+printf 'secrets_dir=%q\n' "$secrets_dir" >"$deploy_hook_config"
+chmod 0600 "$deploy_hook_config"
 temporary_hook=$(mktemp)
 trap 'rm -f "$temporary_hook"' EXIT
 
@@ -89,8 +96,16 @@ cat >"$temporary_hook" <<'EOF'
 set -Eeuo pipefail
 
 container_name=simple-proxy
+source /etc/letsencrypt/renewal-hooks/deploy/simple-proxy.conf
+: "${RENEWED_LINEAGE:?Certbot did not provide RENEWED_LINEAGE}"
 
-# The first certificate may be obtained before the container is created.
+install -o 65532 -g 65532 -m 0400 \
+  "$RENEWED_LINEAGE/fullchain.pem" "$secrets_dir/tls-cert.pem"
+install -o 65532 -g 65532 -m 0400 \
+  "$RENEWED_LINEAGE/privkey.pem" "$secrets_dir/tls-key.pem"
+
+# The first certificate may be obtained before the container is created. The
+# fixed secret files are still populated so the first Compose start succeeds.
 if ! command -v docker >/dev/null 2>&1 ||
   ! docker container inspect "$container_name" >/dev/null 2>&1; then
   exit 0
@@ -122,6 +137,9 @@ fi
 log "Requesting certificate for $domain"
 certbot "${certbot_args[@]}"
 
+log "Copying certificate material into the Compose secret directory"
+RENEWED_LINEAGE="/etc/letsencrypt/live/$domain" "$deploy_hook"
+
 if command -v systemctl >/dev/null 2>&1; then
   log "Enabling Certbot's automatic renewal timer"
   systemctl enable --now certbot.timer
@@ -138,9 +156,9 @@ cat <<EOF
 
 Certificate installed and automatic renewal enabled.
 
-Set these values in the project's .env file:
-SSL_CERT=/etc/letsencrypt/live/$domain/fullchain.pem
-SSL_KEY=/etc/letsencrypt/live/$domain/privkey.pem
+Certificate material is synchronized to:
+$secrets_dir/tls-cert.pem
+$secrets_dir/tls-key.pem
 
 Then start or recreate the proxy with:
 docker compose up -d --build

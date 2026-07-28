@@ -6,6 +6,8 @@ test_port="${YOUTUBE_SSL_TEST_PORT:-$((20000 + ($$ % 20000)))}"
 test_url="${YOUTUBE_TEST_URL:-https://www.youtube.com/generate_204}"
 cert_path="$test_dir/fullchain.pem"
 key_path="$test_dir/privkey.pem"
+auth_path="$test_dir/proxy-basic-auth"
+test_auth="test-user:test-password"
 proxy_pid=""
 
 cleanup() {
@@ -25,6 +27,8 @@ openssl req -x509 -newkey rsa:2048 -nodes \
 	-addext "subjectAltName=DNS:localhost,IP:127.0.0.1" \
 	>/dev/null 2>&1
 chmod 600 "$key_path"
+printf '%s\n' "$test_auth" >"$auth_path"
+chmod 600 "$auth_path"
 
 go build -o "$test_dir/simple-proxy" .
 "$test_dir/simple-proxy" \
@@ -33,6 +37,7 @@ go build -o "$test_dir/simple-proxy" .
 	-protocol https \
 	-cert "$cert_path" \
 	-key "$key_path" \
+	-basic-auth-file "$auth_path" \
 	>"$test_dir/proxy.log" 2>&1 &
 proxy_pid=$!
 
@@ -72,6 +77,7 @@ if ! status_code="$(
 		--max-time 20 \
 		--noproxy "" \
 		--proxy-insecure \
+		--proxy-user "$test_auth" \
 		--proxy "https://127.0.0.1:$test_port" \
 		"$test_url"
 )"; then
