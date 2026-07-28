@@ -1,4 +1,8 @@
 VERSION=development
+DOCKER_COMPOSE ?= docker compose
+
+.PHONY: default zip lint format test test-unit test-integration test-smoke test-youtube test-ci \
+	docker-run docker-build-run docker-stop
 
 default:
 	@echo "=============Building binaries============="
@@ -56,5 +60,40 @@ format:
 	go mod tidy
 
 test:
+	@echo "=============Running all Go tests============="
+	$(MAKE) test-unit
+	$(MAKE) test-integration
+	$(MAKE) test-smoke
+
+test-unit:
 	@echo "=============Running unit tests============="
-	go test ./...
+	go test ./proxy
+
+test-integration:
+	@echo "=============Running integration tests============="
+	go test ./integration
+
+test-smoke:
+	@echo "=============Running smoke test============="
+	./scripts/smoke-test.sh
+
+test-youtube:
+	@echo "=============Testing YouTube through the proxy============="
+	./scripts/youtube-connect-test.sh
+
+test-ci: lint
+	@echo "=============Checking formatting============="
+	test -z "$$(gofmt -l .)"
+	$(MAKE) test
+
+docker-run:
+	@echo "=============Starting Docker services============="
+	$(DOCKER_COMPOSE) up --detach --no-build
+
+docker-build-run:
+	@echo "=============Building and starting Docker services============="
+	$(DOCKER_COMPOSE) up --detach --build
+
+docker-stop:
+	@echo "=============Stopping Docker services============="
+	$(DOCKER_COMPOSE) stop

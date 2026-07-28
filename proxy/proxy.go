@@ -5,9 +5,9 @@ import (
 	"io"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
-	"slices"
 
 	"github.com/golang/glog"
 	netProxy "golang.org/x/net/proxy"
@@ -20,15 +20,15 @@ func NewProxyHandler(timeoutSeconds int) *ProxyHandler {
 }
 
 type ProxyHandler struct {
-	Timeout       time.Duration
-	Username      *string
-	Password      *string
-	LogAuth       bool
-	LogHeaders    bool
-	Socks5Forward *Socks5Forward
+	Timeout           time.Duration
+	Username          *string
+	Password          *string
+	LogAuth           bool
+	LogHeaders        bool
+	Socks5Forward     *Socks5Forward
 	AllowSrcIPAddress []string
-	AllowDestHost	[]string
-	DenyAll			bool
+	AllowDestHost     []string
+	DenyAll           bool
 }
 
 type Socks5Forward struct {
@@ -36,80 +36,81 @@ type Socks5Forward struct {
 	Username *string
 	Password *string
 }
+
 func GetUserIP(r *http.Request) string {
-    IPAddress := r.Header.Get("X-Real-Ip")
-    if IPAddress == "" {
-        IPAddress = r.Header.Get("X-Forwarded-For")
-    }
-    if IPAddress == "" {
+	IPAddress := r.Header.Get("X-Real-Ip")
+	if IPAddress == "" {
+		IPAddress = r.Header.Get("X-Forwarded-For")
+	}
+	if IPAddress == "" {
 		if strings.HasPrefix(r.RemoteAddr, "[::1]") {
 			IPAddress = "[::1]"
 		} else {
-			ipaddr := strings.Split(r.RemoteAddr,":")
+			ipaddr := strings.Split(r.RemoteAddr, ":")
 			if len(ipaddr) > 0 {
 				IPAddress = ipaddr[0]
 			}
 		}
-    }
-	
-    return IPAddress
+	}
+
+	return IPAddress
 }
 
 func (p *ProxyHandler) isAllowed(r *http.Request, ipaddr string) bool {
-	if p.DenyAll &&
-	 	slices.Contains(p.AllowSrcIPAddress, ipaddr) {
+	if !p.DenyAll {
+		return true
+	}
 
-			// If allow dest host is specified then check the dest host
-			if (len(p.AllowDestHost) != 0) {
-				if slices.Contains(p.AllowDestHost, r.Host) {
-					glog.V(3).Infof("ALLOWED host: %v", r.Host)
-					return true
-				} else {
-					glog.V(3).Infof("BLOCKED host: %v, host is not in AllowDestHost: %v", r.Host, p.AllowDestHost)
-					return false
-				}
+	if slices.Contains(p.AllowSrcIPAddress, ipaddr) {
+		// If allow dest host is specified then check the dest host.
+		if len(p.AllowDestHost) != 0 {
+			if slices.Contains(p.AllowDestHost, r.Host) {
+				glog.V(3).Infof("ALLOWED host: %v", r.Host)
+				return true
+			} else {
+				glog.V(3).Infof("BLOCKED host: %v, host is not in AllowDestHost: %v", r.Host, p.AllowDestHost)
+				return false
 			}
-
-			// Allow dest host is not specified, that means all dest host is allowed as long as src ip is allowed
-			return true
 		}
 
-		// Denied
-		return false
+		// Allow dest host is not specified, that means all dest host is allowed as long as src ip is allowed.
+		return true
+	}
+
+	// Denied.
+	return false
 }
-
-
 
 func (p *ProxyHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	if r.URL.Path == "/health" {
+		w.Header().Set("Server", "simple-proxy")
 		w.WriteHeader(http.StatusOK)
-		w.Header().Add("Server", "Ban All")
-		w.Write([]byte("OK\r\n"))
+		_, _ = w.Write([]byte("OK\r\n"))
 		return
 	}
 	if r.TLS != nil {
-				glog.V(1).Infof("TLS Handshake Complete %v", r.TLS.HandshakeComplete)
-				glog.V(1).Infof("TLS Version: %x", r.TLS.Version)
-				glog.V(1).Infof("Cipher Suite: %x", r.TLS.CipherSuite)
+		glog.V(1).Infof("TLS Handshake Complete %v", r.TLS.HandshakeComplete)
+		glog.V(1).Infof("TLS Version: %x", r.TLS.Version)
+		glog.V(1).Infof("Cipher Suite: %x", r.TLS.CipherSuite)
 
-				if len(r.TLS.PeerCertificates) > 0 {
-					clientCert := r.TLS.PeerCertificates[0]
-					glog.V(1).Infof("Client CN: %s", clientCert.Subject.CommonName)
-					glog.V(1).Infof("Client Issuer: %s", clientCert.Issuer.CommonName)
-					glog.V(1).Infof("Client Serial: %s", clientCert.SerialNumber)
-					io.WriteString(w, "Hello, verified client!\n")
-					
-				} else {
-					glog.V(1).Infof("No client certificate presented")
-					// http.Error(w, "Client certificate required", http.StatusUnauthorized)
-				}
-			}
+		if len(r.TLS.PeerCertificates) > 0 {
+			clientCert := r.TLS.PeerCertificates[0]
+			glog.V(1).Infof("Client CN: %s", clientCert.Subject.CommonName)
+			glog.V(1).Infof("Client Issuer: %s", clientCert.Issuer.CommonName)
+			glog.V(1).Infof("Client Serial: %s", clientCert.SerialNumber)
+			io.WriteString(w, "Hello, verified client!\n")
+
+		} else {
+			glog.V(1).Infof("No client certificate presented")
+			// http.Error(w, "Client certificate required", http.StatusUnauthorized)
+		}
+	}
 
 	ipaddr := GetUserIP(r)
-	
-	if p.isAllowed(r, ipaddr) == false {
-		glog.V(1).Infof("BLOCKED '%s' request from '%s' to '%s'. IP Address or dest host not allowed\n", r.Method, ipaddr, r.Host)	
-		http.Error(w, "Forbidden", 403)
+
+	if !p.isAllowed(r, ipaddr) {
+		glog.V(1).Infof("BLOCKED '%s' request from '%s' to '%s'. IP Address or dest host not allowed\n", r.Method, ipaddr, r.Host)
+		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
 	}
 
