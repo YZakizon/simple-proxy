@@ -1,7 +1,8 @@
 VERSION=development
 DOCKER_COMPOSE ?= docker compose
-TEST_SSL_CERT ?= secrets/tls-cert.pem
-TEST_SSL_KEY ?= secrets/tls-key.pem
+TEST_SSL_DIR ?= .test-certs
+TEST_SSL_CERT ?= $(TEST_SSL_DIR)/fullchain.pem
+TEST_SSL_KEY ?= $(TEST_SSL_DIR)/privkey.pem
 
 .PHONY: default zip lint format test test-unit test-integration test-race test-smoke \
 	test-youtube test-youtube-ssl test-ci vuln verify gen-test-ssl live-test \
