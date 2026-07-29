@@ -138,7 +138,7 @@ docker-build-run:
 
 docker-stop:
 	@echo "=============Stopping Docker services============="
-	$(DOCKER_COMPOSE) stop
+	$(DOCKER_COMPOSE) down --remove-orphans
 
 docker-logs:
 	$(DOCKER_COMPOSE) logs -f
