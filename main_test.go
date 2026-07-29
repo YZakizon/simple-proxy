@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -138,5 +140,54 @@ func TestSplitNonempty(t *testing.T) {
 				t.Fatalf("splitNonempty(%q) = %#v, want %#v", test.value, got, test.want)
 			}
 		})
+	}
+}
+
+func TestValidateTLSFilesReportsMissingPath(t *testing.T) {
+	t.Parallel()
+
+	testDir := t.TempDir()
+	certPath := filepath.Join(testDir, "fullchain.pem")
+	keyPath := filepath.Join(testDir, "privkey.pem")
+
+	err := validateTLSFiles(certPath, keyPath)
+	if err == nil || !strings.Contains(err.Error(), "TLS certificate file") {
+		t.Fatalf("missing certificate error = %v", err)
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing certificate error %q does not wrap os.ErrNotExist", err)
+	}
+
+	if err := os.WriteFile(certPath, []byte("certificate"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err = validateTLSFiles(certPath, keyPath)
+	if err == nil || !strings.Contains(err.Error(), "TLS private key file") {
+		t.Fatalf("missing private key error = %v", err)
+	}
+}
+
+func TestServeUntilSignalAddsTLSStartupContext(t *testing.T) {
+	t.Parallel()
+
+	server := &http.Server{Addr: "127.0.0.1:8888"}
+	err := serveUntilSignal(
+		server,
+		httpsProtocol,
+		"/missing/fullchain.pem",
+		"/missing/privkey.pem",
+		1,
+	)
+	if err == nil {
+		t.Fatal("serveUntilSignal() error = nil, want TLS startup failure")
+	}
+	for _, want := range []string{
+		"cannot start HTTPS proxy",
+		"127.0.0.1:8888",
+		"/missing/fullchain.pem",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("error %q does not contain %q", err, want)
+		}
 	}
 }

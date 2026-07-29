@@ -35,7 +35,7 @@ func init() {
 
 func main() {
 	if err := run(); err != nil {
-		log.Fatal(err)
+		log.Fatalf("simple-proxy is exiting because the server could not run: %v", err)
 	}
 }
 
@@ -317,9 +317,15 @@ func serveUntilSignal(server *http.Server, protocol, certPath, keyPath string, m
 	signalContext, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
+	if protocol == httpsProtocol {
+		if err := validateTLSFiles(certPath, keyPath); err != nil {
+			return fmt.Errorf("cannot start HTTPS proxy on %s: %w", server.Addr, err)
+		}
+	}
+
 	listener, err := net.Listen("tcp", server.Addr)
 	if err != nil {
-		return err
+		return fmt.Errorf("listen on %s: %w", server.Addr, err)
 	}
 	limitedListener := netutil.LimitListener(listener, maxConnections)
 
@@ -337,7 +343,7 @@ func serveUntilSignal(server *http.Server, protocol, certPath, keyPath string, m
 		if errors.Is(err, http.ErrServerClosed) {
 			return nil
 		}
-		return err
+		return fmt.Errorf("%s proxy on %s stopped unexpectedly: %w", strings.ToUpper(protocol), server.Addr, err)
 	case <-signalContext.Done():
 		glog.Info("Shutting down proxy")
 		shutdownContext, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -347,6 +353,16 @@ func serveUntilSignal(server *http.Server, protocol, certPath, keyPath string, m
 		}
 		return nil
 	}
+}
+
+func validateTLSFiles(certPath, keyPath string) error {
+	if _, err := os.Stat(certPath); err != nil {
+		return fmt.Errorf("TLS certificate file %q is unavailable: %w", certPath, err)
+	}
+	if _, err := os.Stat(keyPath); err != nil {
+		return fmt.Errorf("TLS private key file %q is unavailable: %w", keyPath, err)
+	}
+	return nil
 }
 
 func checkHealth(rawURL string) error {
