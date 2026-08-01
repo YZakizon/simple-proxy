@@ -10,3 +10,9 @@
   for the pull request's current head.
 - A new commit invalidates an earlier `LGTM`; wait for a fresh verdict on the
   new head before merging.
+
+## Codex pull request reviews
+
+- Review the pull request's current live head before issuing a verdict.
+- Post one concise top-level verdict beginning with either `Blocker` or `LGTM`.
+- End every verdict comment with the footer `Codex Reviewer Agent`.
