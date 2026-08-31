@@ -1,6 +1,6 @@
 module github.com/jthomperoo/simple-proxy
 
-go 1.25.12
+go 1.25.13
 
 require (
 	github.com/golang/glog v1.2.5
